@@ -206,10 +206,16 @@ def train_model(train_csv, val_csv, test_csv):
             df['bigram_count'] = df['url'].apply(lambda x: len(get_char_ngrams(x, 2)))
             df['trigram_count'] = df['url'].apply(lambda x: len(get_char_ngrams(x, 3)))
             print("🔄 Converting features to DataFrame...")
-            # Convert Series to DataFrame and merge
-            feats_df = pd.DataFrame(feats.tolist(), index=feats.index)
-            for col in feats_df.columns:
-                df[col] = feats_df[col]
+            # Handle different pandas behavior
+            if isinstance(feats, pd.DataFrame):
+                # pandas automatically expanded Series to DataFrame
+                for col in feats.columns:
+                    df[col] = feats[col]
+            else:
+                # feats is a Series of Series, need to convert
+                feats_df = pd.DataFrame(feats.tolist(), index=feats.index)
+                for col in feats_df.columns:
+                    df[col] = feats_df[col]
             df.to_csv(feat_csv, index=False)
             print(f"💾 Saved features to {feat_csv}")
         
@@ -364,10 +370,16 @@ def test_model(train_csv, val_csv, test_csv):
             feats = df['url'].apply(extract_features)
             df['bigram_count'] = df['url'].apply(lambda x: len(get_char_ngrams(x, 2)))
             df['trigram_count'] = df['url'].apply(lambda x: len(get_char_ngrams(x, 3)))
-            # Convert Series to DataFrame and merge
-            feats_df = pd.DataFrame(feats.tolist(), index=feats.index)
-            for col in feats_df.columns:
-                df[col] = feats_df[col]
+            # Handle different pandas behavior
+            if isinstance(feats, pd.DataFrame):
+                # pandas automatically expanded Series to DataFrame
+                for col in feats.columns:
+                    df[col] = feats[col]
+            else:
+                # feats is a Series of Series, need to convert
+                feats_df = pd.DataFrame(feats.tolist(), index=feats.index)
+                for col in feats_df.columns:
+                    df[col] = feats_df[col]
             df.to_csv(feat_csv, index=False)
         return df
 
