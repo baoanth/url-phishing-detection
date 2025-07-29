@@ -42,7 +42,19 @@ def load_lexical_domains(filepath):
         print(f"Warning: {filepath} not found. Using empty domains list.")
         return []
 
+def build_domain_length_table(domains):
+    """Tạo bảng tra cứu tên miền theo độ dài để tối ưu hóa tìm kiếm"""
+    length_table = {}
+    for domain in domains:
+        domain_len = len(domain)
+        if domain_len not in length_table:
+            length_table[domain_len] = []
+        length_table[domain_len].append(domain)
+    return length_table
+
 legit_domains = load_lexical_domains("alexa-top-1000.txt")
+# Tạo bảng tra cứu độ dài tên miền để tối ưu hóa
+domain_length_table = build_domain_length_table(legit_domains)
 
 # ========= Feature extraction ========= #
 def get_entropy(s):
@@ -50,16 +62,28 @@ def get_entropy(s):
     prob = [n_x / len(s) for x, n_x in Counter(s).items()]
     return -sum(p * log2(p) for p in prob)
 
-def min_levenshtein_distance(domain, legit_domains):
+def min_levenshtein_distance(domain, domain_length_table):
+    """
+    Tính khoảng cách Levenshtein tối thiểu với các tên miền hợp lệ.
+    Chỉ so sánh với các tên miền có độ dài hơn/kém tối đa 2 ký tự.
+    """
+    if not domain or not domain_length_table:
+        return 1
+    
     try:
-        # Tối ưu: chỉ so sánh với top 100 domains và có early stopping
+        domain_len = len(domain)
         max_ratio = 0
-        for legit in legit_domains[:100]:  # Giới hạn chỉ 100 domain đầu
-            ratio = difflib.SequenceMatcher(None, domain, legit).ratio()
-            if ratio > max_ratio:
-                max_ratio = ratio
-            if ratio > 0.9:  # Early stopping nếu tìm thấy match tốt
-                break
+        
+        # Chỉ so sánh với các tên miền có độ dài trong khoảng [domain_len-2, domain_len+2]
+        for check_len in range(max(1, domain_len - 2), domain_len + 3):
+            if check_len in domain_length_table:
+                for legit_domain in domain_length_table[check_len]:
+                    ratio = difflib.SequenceMatcher(None, domain, legit_domain).ratio()
+                    if ratio > max_ratio:
+                        max_ratio = ratio
+                    if ratio > 0.9:  # Early stopping nếu tìm thấy match tốt
+                        return 1 - max_ratio
+        
         return 1 - max_ratio
     except:
         return 1
@@ -88,7 +112,7 @@ def extract_features(url):
             'count_subdomains': len(parsed.netloc.split('.')) - 2 if len(parsed.netloc.split('.')) > 2 else 0,
             'has_ip': 1 if re.search(r'(\d{1,3}\.){3}\d{1,3}', url) else 0,
             'has_suspicious_words': 1 if any(word in url.lower() for word in ['login', 'secure', 'update', 'verify', 'bank', 'account']) else 0,
-            'spelling_error': min_levenshtein_distance(domain, legit_domains),
+            'spelling_error': min_levenshtein_distance(domain, domain_length_table),
             'url_entropy': get_entropy(url),
             'domain_entropy': get_entropy(domain)
         }
