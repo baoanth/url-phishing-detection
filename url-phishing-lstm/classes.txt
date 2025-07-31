@@ -1,0 +1,2 @@
+1:Phish
+2:Legitimate
